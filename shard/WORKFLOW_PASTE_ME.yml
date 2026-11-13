@@ -1,0 +1,58 @@
+name: dr1-string-scan
+on:
+  workflow_dispatch:
+    inputs:
+      only_shard:
+        description: "Test mode: run just this one machine index (0-19). Leave empty to run all 20."
+        default: ""
+      max_patches:
+        description: "Max patches per worker process (use 1 for a quick test)"
+        default: "1000000"
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    env:
+      GO: ${{ inputs.only_shard == '' || inputs.only_shard == format('{0}', matrix.shard) }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.GO == 'true'
+      - uses: actions/setup-python@v5
+        if: env.GO == 'true'
+        with: { python-version: '3.11' }
+      - run: pip install numpy pandas scipy
+        if: env.GO == 'true'
+      - name: scan this shard (stops at 330 min, results are still uploaded)
+        if: env.GO == 'true'
+        env: { PROCS: 4 }   # public-repo runners have 4 vCPUs
+        run: timeout 330m bash shard.sh 20 ${{ matrix.shard }} ${{ inputs.max_patches }} || true
+      - uses: actions/upload-artifact@v4
+        if: always() && env.GO == 'true'
+        with:
+          name: dr1-shard-${{ matrix.shard }}
+          retention-days: 3
+          path: |
+            /home/claude/strings/dr1/P*/summary*.json
+            /home/claude/strings/run_*.log
+  vet:
+    needs: scan
+    if: always() && inputs.only_shard == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install numpy pandas scipy
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'dr1-shard-*', merge-multiple: true, path: dr1_in }
+      - name: extend every patch peak above the bar (all lines, not just the strongest)
+        run: |
+          bash -c 'sudo mkdir -p /home/claude; sudo chown $(id -u) /home/claude; W=/home/claude/strings; mkdir -p $W/csrc $W/dr1; cp -r mf/. $W/; cp dr1pipe.py ka_vet_all.py tilecenters_dr1.csv $W/; printf "twin_pairs = None\nlines = None\n" > $W/detect.py; cp -r dr1_in/. $W/dr1/ 2>/dev/null || true; cd $W; OMP_NUM_THREADS=1 python3 ka_vet_all.py; cat dr1_results.txt || true'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: dr1-vet-results, path: /home/claude/strings/dr1_results.txt, retention-days: 3 }
