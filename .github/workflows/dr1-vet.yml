@@ -1,0 +1,32 @@
+name: dr1-vet
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Number from the scan run's URL, .../actions/runs/NNNN"
+        required: true
+jobs:
+  vet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      actions: read
+      contents: read
+    defaults:
+      run:
+        working-directory: shard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install numpy pandas scipy
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: 'dr1-shard-*'
+          merge-multiple: true
+          path: dr1_in
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: extend every patch peak above the bar
+        run: |
+          bash -c 'sudo mkdir -p /home/claude; sudo chown $(id -u) /home/claude; W=/home/claude/strings; mkdir -p $W/csrc $W/dr1; cp -r mf/. $W/; cp dr1pipe.py ka_vet_all.py tilecenters_dr1.csv $W/; printf "twin_p
