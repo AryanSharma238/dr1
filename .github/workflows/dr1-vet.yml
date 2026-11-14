@@ -15,6 +15,10 @@ jobs:
     defaults:
       run:
         working-directory: shard
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,7 +31,7 @@ jobs:
           path: dr1_in
           run-id: ${{ inputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: extend every patch peak above the bar
+      - name: extend this share of the patches
         run: |
           sudo mkdir -p /home/claude
           sudo chown $(id -u) /home/claude
@@ -36,11 +40,29 @@ jobs:
           cp -r mf/. $W/
           cp dr1pipe.py ka_vet_all.py tilecenters_dr1.csv $W/
           printf 'twin_pairs = None\nlines = None\n' > $W/detect.py
-          cp -r ../dr1_in/dr1/. $W/dr1/
-          echo "patch folders: $(ls $W/dr1 | wc -l)"
+          for d in ../dr1_in/dr1/P*; do n=$(basename $d); i=$((10#${n#P})); if [ $((i % 20)) -eq ${{ matrix.shard }} ]; then cp -r $d $W/dr1/; fi; done
+          echo "patch folders for this share: $(ls $W/dr1 | wc -l)"
           cd $W
           OMP_NUM_THREADS=1 python3 ka_vet_all.py
           cat dr1_results.txt || true
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: dr1-vet-results, path: /home/claude/strings/dr1_results.txt, retention-days: 3 }
+        with:
+          name: dr1-vet-part-${{ matrix.shard }}
+          path: /home/claude/strings/dr1_results.txt
+          retention-days: 3
+          if-no-files-found: ignore
+  merge:
+    needs: vet
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: 'dr1-vet-part-*'
+          path: parts
+      - run: |
+          cat parts/*/dr1_results.txt > all_results.txt || true
+          sort all_results.txt | head -500
+      - uses: actions/upload-artifact@v4
+        with: { name: dr1-vet-results, path: all_results.txt, retention-days: 3 }
