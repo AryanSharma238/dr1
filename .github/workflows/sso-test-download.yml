@@ -1,0 +1,70 @@
+name: sso-test-download
+on: workflow_dispatch
+jobs:
+  get:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install astroquery astropy
+      - name: download per-exposure VIS catalogs for 6 test fields
+        env:
+          ESA_USER: ${{ secrets.ESA_USER }}
+          ESA_PASS: ${{ secrets.ESA_PASS }}
+          FILES: |
+            EUC_VIS_SWL-CAT-004902-00-1-0000000__20250424T102724.639359Z.fits
+            EUC_VIS_SWL-CAT-004902-00-2-0000000__20250424T102725.356819Z.fits
+            EUC_VIS_SWL-CAT-004902-01-1-0000000__20250424T102717.205250Z.fits
+            EUC_VIS_SWL-CAT-004902-01-2-0000000__20250424T102726.245854Z.fits
+            EUC_VIS_SWL-CAT-004902-02-1-0000000__20250424T102610.481939Z.fits
+            EUC_VIS_SWL-CAT-004902-03-1-0000000__20250424T102719.928817Z.fits
+            EUC_VIS_SWL-CAT-004919-00-1-0000000__20250424T110314.413700Z.fits
+            EUC_VIS_SWL-CAT-004919-00-2-0000000__20250424T110329.873481Z.fits
+            EUC_VIS_SWL-CAT-004919-01-1-0000000__20250424T110319.762507Z.fits
+            EUC_VIS_SWL-CAT-004919-01-2-0000000__20250424T110341.206981Z.fits
+            EUC_VIS_SWL-CAT-004919-02-1-0000000__20250424T110325.866446Z.fits
+            EUC_VIS_SWL-CAT-004919-03-1-0000000__20250424T110311.238813Z.fits
+            EUC_VIS_SWL-CAT-004932-00-1-0000000__20250424T101137.015242Z.fits
+            EUC_VIS_SWL-CAT-004932-00-2-0000000__20250424T101147.356367Z.fits
+            EUC_VIS_SWL-CAT-004932-01-1-0000000__20250424T101144.100181Z.fits
+            EUC_VIS_SWL-CAT-004932-01-2-0000000__20250424T101156.947601Z.fits
+            EUC_VIS_SWL-CAT-004932-02-1-0000000__20250424T101141.099519Z.fits
+            EUC_VIS_SWL-CAT-004932-03-1-0000000__20250424T101140.895882Z.fits
+            EUC_VIS_SWL-CAT-066260-00-1-0000000__20250429T105401.232986Z.fits
+            EUC_VIS_SWL-CAT-066260-00-2-0000000__20250429T105627.749275Z.fits
+            EUC_VIS_SWL-CAT-066260-01-1-0000000__20250429T105825.196231Z.fits
+            EUC_VIS_SWL-CAT-066260-01-2-0000000__20250429T105825.265669Z.fits
+            EUC_VIS_SWL-CAT-066260-02-1-0000000__20250429T103759.950241Z.fits
+            EUC_VIS_SWL-CAT-066260-03-1-0000000__20250429T105553.917230Z.fits
+            EUC_VIS_SWL-CAT-066293-00-1-0000000__20250430T050500.863236Z.fits
+            EUC_VIS_SWL-CAT-066293-00-2-0000000__20250430T050430.863520Z.fits
+            EUC_VIS_SWL-CAT-066293-01-1-0000000__20250430T050442.178668Z.fits
+            EUC_VIS_SWL-CAT-066293-01-2-0000000__20250430T050443.788717Z.fits
+            EUC_VIS_SWL-CAT-066293-02-1-0000000__20250430T050146.202614Z.fits
+            EUC_VIS_SWL-CAT-066293-03-1-0000000__20250430T050439.062268Z.fits
+            EUC_VIS_SWL-CAT-066320-00-1-0000000__20250429T153716.164761Z.fits
+            EUC_VIS_SWL-CAT-066320-00-2-0000000__20250429T153723.420590Z.fits
+            EUC_VIS_SWL-CAT-066320-01-1-0000000__20250429T153729.145403Z.fits
+            EUC_VIS_SWL-CAT-066320-01-2-0000000__20250429T153803.473745Z.fits
+            EUC_VIS_SWL-CAT-066320-02-1-0000000__20250429T153356.675714Z.fits
+            EUC_VIS_SWL-CAT-066320-03-1-0000000__20250429T153731.177659Z.fits
+        run: |
+          mkdir -p sso_cat
+          python - <<'PY'
+          import os
+          from astroquery.esa.euclid import Euclid
+          Euclid.login(user=os.environ["ESA_USER"], password=os.environ["ESA_PASS"])
+          ok = 0
+          for f in os.environ["FILES"].split():
+              try:
+                  Euclid.get_product(file_name=f, output_file="sso_cat/" + f); ok += 1
+              except Exception as e:
+                  print("FAILED", f, e)
+          print(ok, "files downloaded")
+          Euclid.logout()
+          PY
+          ls -la sso_cat | head
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: sso-test-catalogs, path: sso_cat, retention-days: 3 }
