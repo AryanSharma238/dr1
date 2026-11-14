@@ -6,7 +6,7 @@ set -euo pipefail
 M=$1; K=$2; MAXP=${3:-1000000}; PROCS=${PROCS:-2}; SRC=$(cd "$(dirname "$0")" && pwd); W=/home/claude/strings
 [ -f "$SRC/tilecenters_dr1.csv" ] || { echo "ERROR: tilecenters_dr1.csv missing next to shard.sh"; exit 1; }
 sudo mkdir -p /home/claude 2>/dev/null || mkdir -p /home/claude; sudo chown "$(id -u)" /home/claude 2>/dev/null || true
-mkdir -p $W/csrc $W/dr1; cp -r "$SRC"/mf/. $W/; cp "$SRC"/dr1pipe.py "$SRC"/ka_vet_all.py "$SRC"/tilecenters_dr1.csv $W/
+mkdir -p $W/csrc $W/dr1; cp -r "$SRC"/mf/. $W/; cp "$SRC"/dr1pipe.py "$SRC"/twinscan.py "$SRC"/ka_vet_all.py "$SRC"/tilecenters_dr1.csv $W/
 cp "$SRC"/hough_fast.c $W/csrc/hough_fast.c
 [ -f $W/detect.py ] || printf 'twin_pairs = None\nlines = None\n' > $W/detect.py   # import shim: detect.py was not in the zip
 touch $W/tiles_dr1.csv                                    # dr1run only needs it to exist
