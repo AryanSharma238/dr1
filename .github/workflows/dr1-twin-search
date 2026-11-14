@@ -1,0 +1,52 @@
+name: dr1-twin-search
+on:
+  workflow_dispatch:
+    inputs:
+      only_shard:
+        description: "Test mode: run just this one machine index (0-19). Leave empty to run all 20."
+        default: ""
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    defaults: { run: { working-directory: shard } }
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    env:
+      GO: ${{ inputs.only_shard == '' || inputs.only_shard == format('{0}', matrix.shard) }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.GO == 'true'
+      - uses: actions/setup-python@v5
+        if: env.GO == 'true'
+        with: { python-version: '3.11' }
+      - run: pip install numpy pandas scipy
+        if: env.GO == 'true'
+      - name: twin-pair search on this shard (download + pair search only, no Hough scan)
+        if: env.GO == 'true'
+        env: { PROCS: 4, TWIN_ONLY: "1" }
+        run: timeout 330m bash shard.sh 20 ${{ matrix.shard }} || true
+      - uses: actions/upload-artifact@v4
+        if: always() && env.GO == 'true'
+        with:
+          name: dr1-twin-${{ matrix.shard }}
+          retention-days: 3
+          path: |
+            /home/claude/strings/dr1/P*/twin.json
+            /home/claude/strings/run_*.log
+  collect:
+    needs: scan
+    if: always() && inputs.only_shard == ''
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: shard } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'dr1-twin-*', merge-multiple: true, path: twin_in }
+      - run: python twin_collect.py ../twin_in | tee ../twin_results.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: dr1-twin-results, path: twin_results.txt, retention-days: 3 }
