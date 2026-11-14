@@ -1,0 +1,54 @@
+name: dr1-kbo-search
+on:
+  workflow_dispatch:
+    inputs:
+      only_shard:
+        description: "Test mode: run just this machine index (0-19). Leave empty to run all 20."
+        default: ""
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    defaults: { run: { working-directory: sso } }
+    strategy:
+      fail-fast: false
+      matrix: { shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19] }
+    env:
+      GO: ${{ inputs.only_shard == '' || inputs.only_shard == format('{0}', matrix.shard) }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.GO == 'true'
+      - uses: actions/setup-python@v5
+        if: env.GO == 'true'
+        with: { python-version: '3.11' }
+      - run: pip install numpy pandas scipy astropy astroquery
+        if: env.GO == 'true'
+      - name: search this shard's observations
+        if: env.GO == 'true'
+        run: timeout 335m python run_shard.py 20 ${{ matrix.shard }} || true
+      - uses: actions/upload-artifact@v4
+        if: always() && env.GO == 'true'
+        with:
+          name: kbo-part-${{ matrix.shard }}
+          path: sso/out
+          retention-days: 7
+  collect:
+    needs: search
+    if: always() && inputs.only_shard == ''
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: sso } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install pandas
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'kbo-part-*', path: sso/parts }
+      - run: python collect.py | tee results.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kbo-results
+          retention-days: 7
+          path: |
+            sso/all_*.csv
+            sso/results.txt
