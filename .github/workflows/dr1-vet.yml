@@ -29,4 +29,18 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: extend every patch peak above the bar
         run: |
-          bash -c 'sudo mkdir -p /home/claude; sudo chown $(id -u) /home/claude; W=/home/claude/strings; mkdir -p $W/csrc $W/dr1; cp -r mf/. $W/; cp dr1pipe.py ka_vet_all.py tilecenters_dr1.csv $W/; printf "twin_p
+          sudo mkdir -p /home/claude
+          sudo chown $(id -u) /home/claude
+          W=/home/claude/strings
+          mkdir -p $W/csrc $W/dr1
+          cp -r mf/. $W/
+          cp dr1pipe.py ka_vet_all.py tilecenters_dr1.csv $W/
+          printf 'twin_pairs = None\nlines = None\n' > $W/detect.py
+          cp -r ../dr1_in/dr1/. $W/dr1/
+          echo "patch folders: $(ls $W/dr1 | wc -l)"
+          cd $W
+          OMP_NUM_THREADS=1 python3 ka_vet_all.py
+          cat dr1_results.txt || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: dr1-vet-results, path: /home/claude/strings/dr1_results.txt, retention-days: 3 }
