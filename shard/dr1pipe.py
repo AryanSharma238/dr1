@@ -48,7 +48,7 @@ import twinscan
 _tw = twinscan.run(np.asarray(x, float), np.asarray(y, float), flux, ferr, a, f"{WD}/twin.json", RA0, DEC0)
 print(f"[{TAG}] twin search: {_tw['npairs']} pairs, max {_tw['max']:.0f}, scramble max {_tw['scramble_max']:.0f}", flush=True)
 if os.environ.get("TWIN_ONLY"):
-    json.dump(dict(tag=TAG, twin_only=True), open(f"{WD}/summary.json", "w")); sys.exit(0)
+    json.dump(dict(tag=TAG, twin_only=True, max_S=0.0), open(f"{WD}/summary.json", "w")); sys.exit(0)
 from blind import scan, CELL
 from weights import weights
 aa = D.semimajor_axis.values * 0.1; ee = D.ellipticity.values; chi = (1 - (1 - ee) ** 2) / (1 + (1 - ee) ** 2); ang = np.radians(90 - D.position_angle.values)
